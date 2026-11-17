@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api, { getErrorMessage } from '../services/api'
 
 function PageTitle({ eyebrow, title, description, action }) {
@@ -54,14 +54,16 @@ function getLoanUrgency(loan) {
 }
 
 function LoanCard({ loan, notice, urgent = false }) {
+  const isTargetMet = loan.target_membaca_aktif && Number(loan.total_menit_3_hari || 0) >= 30
+  const displayNotice = isTargetMet ? (notice || '30/30, misi terpenuhi!') : notice
   return (
-    <article className={`loan-card ${urgent ? 'loan-card-urgent' : ''}`}>
+    <article className={`loan-card ${urgent ? 'loan-card-urgent' : ''} ${isTargetMet ? 'loan-card-success' : ''}`}>
       <div className="mini-cover">▤</div>
       <div className="loan-card-copy">
         <h3>{loan.buku?.judul}</h3>
         <p className="muted">{loan.buku?.penulis}</p>
         <small>Jatuh tempo {new Date(loan.tanggal_jatuh_tempo).toLocaleDateString('id-ID')}</small>
-        {notice && <span className="loan-urgency">{notice}</span>}
+        {displayNotice && <span className={`loan-urgency ${isTargetMet ? 'target-met' : ''}`}>{displayNotice}</span>}
       </div>
       <Link className="button secondary" to={`/reader/${loan.id_peminjaman}`}>Baca</Link>
     </article>
@@ -146,7 +148,13 @@ export function BookshelfPage() {
             <LoanCard
               key={loan.id_peminjaman}
               loan={loan}
-              notice={loan.target_membaca_aktif ? `Progres periode ini ${loan.total_menit_3_hari || 0}/30 menit.` : ''}
+              notice={
+                loan.target_membaca_aktif
+                  ? (Number(loan.total_menit_3_hari || 0) >= 30
+                      ? '30/30, misi terpenuhi!'
+                      : `Progres periode ini ${loan.total_menit_3_hari || 0}/30 menit.`)
+                  : ''
+              }
             />
           ))}
         </div>
@@ -229,6 +237,8 @@ export function SearchPage() {
 export function BookDetailPage() {
   const { bookId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isLibrarian = location.pathname.startsWith('/librarian')
   const [book, setBook] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -286,7 +296,7 @@ export function BookDetailPage() {
   const keywords = Array.isArray(book.kata_kunci) ? book.kata_kunci : []
   return (
     <>
-      <Link to="/search" className="back-link">← Kembali ke koleksi</Link>
+      <Link to={isLibrarian ? "/librarian/collections" : "/search"} className="back-link">← Kembali ke koleksi</Link>
       {error && <p className="notice error">{error}</p>}
       <section className="detail-layout">
         <div className="detail-cover book-cover"><span>{book.kategori}</span><b>{book.judul.slice(0, 1)}</b><small>iBI Library</small></div>
@@ -446,22 +456,52 @@ export function AntreanSaya() {
 }
 
 export function NotificationsPage({ audience = 'member' }) {
+  const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
+  const [catalog, setCatalog] = useState([])
   const [error, setError] = useState('')
   const isLibrarian = audience === 'librarian'
   const refresh = useCallback(() => api.get('/notifikasi').then(({ data }) => setNotifications(data)).catch((requestError) => setError(getErrorMessage(requestError))), [])
+
   useEffect(() => {
     refresh()
     const timer = window.setInterval(refresh, 15000)
     return () => window.clearInterval(timer)
   }, [refresh])
 
-  async function markRead(id) {
+  useEffect(() => {
+    api.get('/buku').then(({ data }) => setCatalog(data)).catch(() => {})
+  }, [])
+
+  async function markRead(id, event) {
+    if (event) {
+      event.stopPropagation()
+    }
     try {
       await api.patch(`/notifikasi/${id}/baca`)
       setNotifications((current) => current.map((item) => item.id_notifikasi === id ? { ...item, status_baca: true } : item))
     } catch (requestError) {
       setError(getErrorMessage(requestError))
+    }
+  }
+
+  function resolveBookId(item) {
+    if (item.id_buku) return item.id_buku
+    if (item.buku?.id_buku) return item.buku.id_buku
+    const match = item.isi_pesan?.match(/"([^"]+)"/)
+    if (match && catalog.length > 0) {
+      const found = catalog.find((b) => b.judul.toLowerCase() === match[1].toLowerCase())
+      if (found) return found.id_buku
+    }
+    return null
+  }
+
+  function handleNotificationClick(item, bookPath) {
+    if (!item.status_baca) {
+      markRead(item.id_notifikasi)
+    }
+    if (bookPath) {
+      navigate(bookPath)
     }
   }
 
@@ -474,13 +514,62 @@ export function NotificationsPage({ audience = 'member' }) {
       />
       {error && <p className="notice error">{error}</p>}
       {notifications.length === 0 ? <div className="empty-state"><span>♧</span><h3>{isLibrarian ? 'Belum ada pembaruan' : 'Semua tenang di sini'}</h3><p>Notifikasi baru akan muncul saat ada pembaruan.</p></div> : (
-        <div className="notification-list">{notifications.map((item) => (
-          <article className={`notification-card ${item.status_baca ? '' : 'unread'}`} key={item.id_notifikasi}>
-            <span className="notification-icon">{item.jenis_notifikasi === 'antrean_tiba' ? '◷' : '✿'}</span>
-            <div><div className="notification-heading"><b>{item.jenis_notifikasi.replaceAll('_', ' ')}</b><time>{new Date(item.waktu_kirim).toLocaleString('id-ID')}</time></div><p>{item.isi_pesan}</p></div>
-            {!item.status_baca && <button className="text-link" onClick={() => markRead(item.id_notifikasi)}>Tandai dibaca</button>}
-          </article>
-        ))}</div>
+        <div className="notification-list">{notifications.map((item) => {
+          const bookId = resolveBookId(item)
+          const bookPath = bookId ? (isLibrarian ? `/librarian/books/${bookId}` : `/books/${bookId}`) : null
+
+          return (
+            <article
+              className={`notification-card ${item.status_baca ? '' : 'unread'} ${bookPath ? 'clickable' : ''}`}
+              key={item.id_notifikasi}
+              onClick={() => handleNotificationClick(item, bookPath)}
+              role={bookPath ? 'button' : undefined}
+              tabIndex={bookPath ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (bookPath && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault()
+                  handleNotificationClick(item, bookPath)
+                }
+              }}
+            >
+              <span className="notification-icon">{item.jenis_notifikasi === 'antrean_tiba' ? '◷' : '✿'}</span>
+              <div className="notification-body">
+                <div className="notification-heading">
+                  <b>{item.jenis_notifikasi.replaceAll('_', ' ')}</b>
+                  <time>{new Date(item.waktu_kirim).toLocaleString('id-ID')}</time>
+                </div>
+                <p>{item.isi_pesan}</p>
+                {bookPath && (
+                  <span className="notification-target-hint">
+                    Buka buku <span>→</span>
+                  </span>
+                )}
+              </div>
+              <div className="notification-actions" onClick={(e) => e.stopPropagation()}>
+                {bookPath && (
+                  <Link
+                    className="button secondary notification-book-action"
+                    to={bookPath}
+                    onClick={() => {
+                      if (!item.status_baca) markRead(item.id_notifikasi)
+                    }}
+                  >
+                    Lihat buku
+                  </Link>
+                )}
+                {!item.status_baca && (
+                  <button
+                    type="button"
+                    className="text-link"
+                    onClick={(e) => markRead(item.id_notifikasi, e)}
+                  >
+                    Tandai dibaca
+                  </button>
+                )}
+              </div>
+            </article>
+          )
+        })}</div>
       )}
     </>
   )

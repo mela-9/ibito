@@ -194,42 +194,95 @@ class DemoDataSeeder extends Seeder
         );
         $this->seedReadingActivities($completedLoanId, $completedStart, 4);
 
-        $nearDueStart = $periodStart->copy()->subDays(13)->addHours(8);
-        $nearDueLoanId = $this->upsertLoan(
+        // 1. Catatan tentang Hidup Berkelanjutan: jatuh tempo 2 hari lagi, hari ke-13 pinjaman, bebas aturan target membaca
+        $sustainableStart = $periodStart->copy()->subDays(12)->addHours(8);
+        $sustainableDue = $periodStart->copy()->addDays(2)->addHours(8);
+        $sustainableLoanId = $this->upsertLoan(
             $member->id_pengguna,
-            $books[8]->id_buku,
-            $nearDueStart,
-            $nearDueStart->copy()->addWeeks(2),
+            $books[9]->id_buku,
+            $sustainableStart,
+            $sustainableDue,
             'aktif',
-            $nearDueStart,
-            $nearDueStart
+            $sustainableStart,
+            $sustainableStart
         );
-        $this->seedReadingActivities($nearDueLoanId, $nearDueStart, 4);
+        $this->seedReadingActivities($sustainableLoanId, $sustainableStart, 4);
         $this->upsertNotification(
             $member->id_pengguna,
             'masa_pinjam_hampir_habis',
-            "Hak akses pinjam \"{$books[8]->judul}\" akan segera selesai.",
+            "Hak akses pinjam \"{$books[9]->judul}\" akan segera selesai.",
             $periodStart->copy()->addHours(8),
-            false
+            false,
+            $books[9]->id_buku
         );
 
-        $readingStart = $periodStart->copy()->subDays(8)->addHours(8);
-        $readingLoanId = $this->upsertLoan(
+        // 2. Catatan tentang Ekonomi Kreatif: jatuh tempo 3 hari lagi, sisa 1 hari periode membaca, durasi 27 menit
+        $creativeStart = $periodStart->copy()->subDays(10)->addHours(8);
+        $creativeDue = $periodStart->copy()->addDays(3)->addHours(8);
+        $creativeLoanId = $this->upsertLoan(
             $member->id_pengguna,
-            $books[9]->id_buku,
-            $readingStart,
-            $readingStart->copy()->addWeeks(2),
+            $books[8]->id_buku,
+            $creativeStart,
+            $creativeDue,
             'aktif',
-            $readingStart,
-            $readingStart
+            $creativeStart,
+            $creativeStart
         );
-        $this->seedReadingActivities($readingLoanId, $readingStart, 2);
+        $this->seedReadingActivities($creativeLoanId, $creativeStart, 3);
+        $activityDate = $periodStart->copy()->subDay();
+        DB::table('aktivitas_baca')->updateOrInsert(
+            [
+                'id_peminjaman' => $creativeLoanId,
+                'tanggal_baca' => $activityDate->toDateString(),
+            ],
+            [
+                'durasi_menit' => 27,
+                'status_syarat' => false,
+                'created_at' => $activityDate->copy()->setTime(19, 0)->toDateTimeString(),
+                'updated_at' => $activityDate->copy()->setTime(19, 0)->toDateTimeString(),
+            ]
+        );
         $this->upsertNotification(
             $member->id_pengguna,
             'pengingat_durasi',
-            "Durasi 30 menit belum terpenuhi untuk \"{$books[9]->judul}\".",
+            "Durasi 30 menit belum terpenuhi untuk \"{$books[8]->judul}\".",
             $periodStart->copy()->addHours(9),
-            false
+            false,
+            $books[8]->id_buku
+        );
+
+        // 3. Menjelajahi Hutan Tropis: jatuh tempo 4 hari lagi, hari ke-10 selesai 30 menit, misi terpenuhi
+        $tropicalStart = $periodStart->copy()->subDays(10)->addHours(8);
+        $tropicalDue = $periodStart->copy()->addDays(4)->addHours(8);
+        $tropicalLoanId = $this->upsertLoan(
+            $member->id_pengguna,
+            $books[10]->id_buku,
+            $tropicalStart,
+            $tropicalDue,
+            'aktif',
+            $tropicalStart,
+            $tropicalStart
+        );
+        $this->seedReadingActivities($tropicalLoanId, $tropicalStart, 3);
+        DB::table('aktivitas_baca')->updateOrInsert(
+            [
+                'id_peminjaman' => $tropicalLoanId,
+                'tanggal_baca' => $activityDate->toDateString(),
+            ],
+            [
+                'durasi_menit' => 30,
+                'status_syarat' => true,
+                'created_at' => $activityDate->copy()->setTime(19, 0)->toDateTimeString(),
+                'updated_at' => $activityDate->copy()->setTime(19, 0)->toDateTimeString(),
+            ]
+        );
+        $this->upsertNotification(
+            $member->id_pengguna,
+            'aktivitas_baca',
+            "Riwayat membaca \"{$books[10]->judul}\" telah tersimpan di akun Anda.",
+            $periodStart->copy()->subDay()->setTime(19, 0),
+            true,
+            $books[10]->id_buku
         );
 
         $newLoanStart = $periodStart->copy()->addHours(8)->addMinutes(30);
@@ -251,7 +304,8 @@ class DemoDataSeeder extends Seeder
                 'antrean_menunggu',
                 "Anda berada di posisi 2 dalam antrean \"{$books[$bookIndex]->judul}\".",
                 $joinedAt,
-                false
+                false,
+                $books[$bookIndex]->id_buku
             );
         }
 
@@ -262,7 +316,8 @@ class DemoDataSeeder extends Seeder
             'antrean_menunggu',
             "Anda berada di posisi 4 dalam antrean \"{$books[6]->judul}\".",
             $cancelledQueueTime,
-            false
+            false,
+            $books[6]->id_buku
         );
     }
 
@@ -411,7 +466,8 @@ class DemoDataSeeder extends Seeder
                 'aktivitas_baca',
                 $message,
                 $sentAt,
-                $index % 4 === 0
+                $index % 4 === 0,
+                $book->id_buku
             );
         }
 
@@ -424,7 +480,8 @@ class DemoDataSeeder extends Seeder
                 'antrean_menunggu',
                 "Anda berada di posisi 1 dalam antrean \"{$book->judul}\".",
                 $sentAt,
-                false
+                false,
+                $book->id_buku
             );
         }
 
@@ -436,7 +493,8 @@ class DemoDataSeeder extends Seeder
                 'antrean_menunggu',
                 'Anda berada di posisi '.($position + 1)." dalam antrean \"{$book->judul}\".",
                 $sentAt,
-                false
+                false,
+                $book->id_buku
             );
         }
 
@@ -455,7 +513,8 @@ class DemoDataSeeder extends Seeder
                     'pengingat_durasi',
                     "Durasi 30 menit belum terpenuhi untuk \"{$book->judul}\".",
                     $sentAt,
-                    true
+                    true,
+                    $book->id_buku
                 );
             }
         }
@@ -471,7 +530,8 @@ class DemoDataSeeder extends Seeder
                 'masa_pinjam_hampir_habis',
                 "Hak akses pinjam \"{$book->judul}\" akan segera selesai.",
                 $sentAt,
-                false
+                false,
+                $book->id_buku
             );
         }
     }
@@ -536,7 +596,8 @@ class DemoDataSeeder extends Seeder
         string $type,
         string $message,
         Carbon $sentAt,
-        bool $read
+        bool $read,
+        ?int $bookId = null
     ): void {
         $existingId = DB::table('notifikasi')
             ->where('id_pengguna', $userId)
@@ -545,6 +606,7 @@ class DemoDataSeeder extends Seeder
             ->whereDate('waktu_kirim', $sentAt->toDateString())
             ->value('id_notifikasi');
         $values = [
+            'id_buku' => $bookId,
             'waktu_kirim' => $sentAt->toDateTimeString(),
             'status_baca' => $read,
             'updated_at' => $sentAt->toDateTimeString(),
@@ -558,6 +620,7 @@ class DemoDataSeeder extends Seeder
 
         DB::table('notifikasi')->insert([
             'id_pengguna' => $userId,
+            'id_buku' => $bookId,
             'jenis_notifikasi' => $type,
             'isi_pesan' => $message,
             ...$values,

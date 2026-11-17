@@ -16,6 +16,9 @@ Route::get('/buku/{koleksiBuku}', [KoleksiBukuController::class, 'show']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::put('/profil', [AuthController::class, 'updateProfile']);
+    Route::post('/profil/minta-otp-sandi', [AuthController::class, 'requestPasswordOtp']);
+    Route::post('/profil/ubah-sandi', [AuthController::class, 'changePasswordWithOtp']);
 
     Route::get('/peminjaman', [PeminjamanController::class, 'index']);
     Route::post('/peminjaman', [PeminjamanController::class, 'store']);

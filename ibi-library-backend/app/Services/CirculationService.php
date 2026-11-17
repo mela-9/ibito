@@ -70,7 +70,8 @@ class CirculationService
             $this->notify(
                 $user->id_pengguna,
                 'antrean_tiba',
-                "Anda masuk antrean untuk buku \"{$book->judul}\"."
+                "Anda masuk antrean untuk buku \"{$book->judul}\".",
+                $bookId
             );
 
             return ['status' => 'queued', 'data' => $queue->load('buku')];
@@ -119,7 +120,8 @@ class CirculationService
             $this->notify(
                 $next->id_pengguna,
                 'antrean_tiba',
-                "Giliran Anda tiba! \"{$book->judul}\" otomatis dipinjamkan hingga {$loan->tanggal_jatuh_tempo->format('d M Y')}."
+                "Giliran Anda tiba! \"{$book->judul}\" otomatis dipinjamkan hingga {$loan->tanggal_jatuh_tempo->format('d M Y')}.",
+                $book->id_buku
             );
             $activeCount++;
         }
@@ -199,7 +201,8 @@ class CirculationService
                 $this->notifyOnceToday(
                     $loan->id_pengguna,
                     'masa_pinjam_hampir_habis',
-                    "Hak akses pinjam \"{$bookTitle}\" akan segera selesai."
+                    "Hak akses pinjam \"{$bookTitle}\" akan segera selesai.",
+                    $loan->id_buku
                 );
             }
 
@@ -211,7 +214,8 @@ class CirculationService
             $this->notifyOnceToday(
                 $loan->id_pengguna,
                 'pengingat_durasi',
-                "Durasi 30 menit belum terpenuhi untuk \"{$bookTitle}\"."
+                "Durasi 30 menit belum terpenuhi untuk \"{$bookTitle}\".",
+                $loan->id_buku
             );
         }
     }
@@ -235,17 +239,18 @@ class CirculationService
         ]);
     }
 
-    private function notify(int $userId, string $type, string $message): void
+    private function notify(int $userId, string $type, string $message, ?int $bookId = null): void
     {
         Notifikasi::query()->create([
             'id_pengguna' => $userId,
+            'id_buku' => $bookId,
             'jenis_notifikasi' => $type,
             'isi_pesan' => $message,
             'waktu_kirim' => now(),
         ]);
     }
 
-    private function notifyOnceToday(int $userId, string $type, string $message): void
+    private function notifyOnceToday(int $userId, string $type, string $message, ?int $bookId = null): void
     {
         $alreadySent = Notifikasi::query()
             ->where('id_pengguna', $userId)
@@ -255,7 +260,7 @@ class CirculationService
             ->exists();
 
         if (! $alreadySent) {
-            $this->notify($userId, $type, $message);
+            $this->notify($userId, $type, $message, $bookId);
         }
     }
 }

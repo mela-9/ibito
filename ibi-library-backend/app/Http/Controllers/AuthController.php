@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -65,6 +66,66 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Anda berhasil keluar.']);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $validated = $request->validate([
+            'nama' => ['required', 'string', 'max:255'],
+        ]);
+
+        $user = $request->user();
+        $user->update([
+            'nama' => $validated['nama'],
+        ]);
+
+        return response()->json([
+            'message' => 'Profil berhasil diperbarui.',
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    public function requestPasswordOtp(Request $request)
+    {
+        $user = $request->user();
+        $otp = (string) random_int(100000, 999999);
+
+        Cache::put('password_otp_'.$user->id_pengguna, $otp, now()->addMinutes(15));
+
+        return response()->json([
+            'message' => 'Kode OTP berhasil dibuat dan dikirim ke email Anda.',
+            'otp' => $otp,
+            'email' => $user->email,
+            'expires_in_minutes' => 15,
+        ]);
+    }
+
+    public function changePasswordWithOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'otp' => ['required', 'string'],
+            'kata_sandi' => ['required', 'string', 'min:8'],
+        ]);
+
+        $user = $request->user();
+        $cachedOtp = Cache::get('password_otp_'.$user->id_pengguna);
+
+        if (! $cachedOtp || (string) $cachedOtp !== trim($validated['otp'])) {
+            throw ValidationException::withMessages([
+                'otp' => ['Kode OTP salah atau sudah kedaluwarsa.'],
+            ]);
+        }
+
+        $user->update([
+            'kata_sandi' => $validated['kata_sandi'],
+        ]);
+
+        Cache::forget('password_otp_'.$user->id_pengguna);
+
+        return response()->json([
+            'message' => 'Kata sandi berhasil diperbarui di database.',
+            'user' => $user->fresh(),
+        ]);
     }
 
     public function verifyMember(Request $request, User $pengguna)

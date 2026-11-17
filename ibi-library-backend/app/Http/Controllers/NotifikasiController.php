@@ -11,6 +11,7 @@ class NotifikasiController extends Controller
     {
         return Notifikasi::query()
             ->where('id_pengguna', $request->user()->id_pengguna)
+            ->with('buku:id_buku,judul,penulis,kategori')
             ->latest('waktu_kirim')
             ->limit(100)
             ->get();

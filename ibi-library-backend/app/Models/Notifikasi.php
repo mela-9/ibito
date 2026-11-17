@@ -12,6 +12,7 @@ class Notifikasi extends Model
 
     protected $fillable = [
         'id_pengguna',
+        'id_buku',
         'jenis_notifikasi',
         'isi_pesan',
         'waktu_kirim',
@@ -24,5 +25,15 @@ class Notifikasi extends Model
             'waktu_kirim' => 'datetime',
             'status_baca' => 'boolean',
         ];
+    }
+
+    public function buku()
+    {
+        return $this->belongsTo(KoleksiBuku::class, 'id_buku', 'id_buku');
+    }
+
+    public function pengguna()
+    {
+        return $this->belongsTo(User::class, 'id_pengguna', 'id_pengguna');
     }
 }

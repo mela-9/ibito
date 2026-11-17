@@ -247,6 +247,7 @@ export default function App() {
       <Route element={user?.peran === 'pustakawan' ? <LibrarianLayout user={user} onLogout={logout} /> : <Navigate to={user ? homePath : '/login'} replace />}>
         <Route path="/librarian" element={<DashboardPage />} />
         <Route path="/librarian/collections" element={<LibrarianCollectionsPage />} />
+        <Route path="/librarian/books/:bookId" element={<BookDetailPage />} />
         <Route path="/librarian/members" element={<LibrarianMembersPage />} />
         <Route path="/librarian/notifications" element={<NotificationsPage audience="librarian" />} />
       </Route>

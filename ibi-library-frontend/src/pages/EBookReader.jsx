@@ -83,9 +83,9 @@ export default function EBookReader() {
         <div className="reader-days"><small>SISA PINJAM</small><b>{daysLeft} hari</b></div>
       </header>
       <div className="reader-target">
-        <div className="reader-target-title"><div><span className="summary-icon lavender">◷</span><span><b>{targetActive ? 'Target membaca tiap 3 hari' : 'Masa pinjam segera berakhir'}</b><small>{targetActive ? 'Minimal 30 menit dalam setiap periode 3 hari untuk mempertahankan pinjaman' : 'Tidak ada target membaca tambahan pada hari ke-13 dan 14'}</small></span></div>{targetActive && <b>{Math.min(30, totalReadMinutes)} / 30 menit</b>}</div>
+        <div className="reader-target-title"><div><span className="summary-icon lavender">◷</span><span><b>{targetActive ? (targetMet ? 'Target membaca terpenuhi' : 'Target membaca tiap 3 hari') : 'Masa pinjam segera berakhir'}</b><small>{targetActive ? (targetMet ? '30/30, misi terpenuhi!' : 'Minimal 30 menit dalam setiap periode 3 hari untuk mempertahankan pinjaman') : 'Tidak ada target membaca tambahan pada hari ke-13 dan 14'}</small></span></div>{targetActive && <b>{targetMet ? '30/30, misi terpenuhi!' : `${Math.min(30, totalReadMinutes)} / 30 menit`}</b>}</div>
         {targetActive && <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>}
-        {targetActive && targetMet && <p className="target-success">✓ Syarat membaca 30 menit terpenuhi. Terima kasih sudah membaca!</p>}
+        {targetActive && targetMet && <p className="target-success">✓ 30/30, misi terpenuhi! Terima kasih sudah membaca.</p>}
       </div>
       {error && <p className="notice error">{error}</p>}
       <div className="reader-workspace">

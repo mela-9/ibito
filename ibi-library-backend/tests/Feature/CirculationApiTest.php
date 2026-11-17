@@ -362,6 +362,28 @@ class CirculationApiTest extends TestCase
         }
     }
 
+    public function test_notifications_include_book_id_and_book_relationship(): void
+    {
+        $member = $this->createMember('notif-target@example.test');
+        $book = KoleksiBuku::query()->create([
+            'judul' => 'Buku Notifikasi Uji',
+            'penulis' => 'Penulis Notif',
+            'kategori' => 'Sains',
+            'kuota_maks' => 0,
+        ]);
+
+        Sanctum::actingAs($member);
+        $this->postJson('/api/peminjaman', ['id_buku' => $book->id_buku])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $this->getJson('/api/notifikasi')
+            ->assertOk()
+            ->assertJsonPath('0.id_buku', $book->id_buku)
+            ->assertJsonPath('0.buku.id_buku', $book->id_buku)
+            ->assertJsonPath('0.buku.judul', 'Buku Notifikasi Uji');
+    }
+
     private function createMember(string $email): User
     {
         return User::query()->create([
